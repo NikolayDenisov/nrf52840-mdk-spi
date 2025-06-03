@@ -12,6 +12,9 @@ $(OUTPUT_DIRECTORY)/nrf52840_xxaa.out: \
 # Source files common to all targets
 SRC_FILES += \
   $(SDK_ROOT)/modules/nrfx/mdk/gcc_startup_nrf52840.S \
+  $(PROJ_DIR)/src/epd.c \
+  $(PROJ_DIR)/src/gpio.c \
+  $(PROJ_DIR)/src/spi.c \
   $(PROJ_DIR)/main.c \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT.c \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT_Syscalls_GCC.c \
@@ -36,6 +39,7 @@ INC_FOLDERS += \
   $(SDK_ROOT)/modules/nrfx/hal \
   $(SDK_ROOT)/components/boards \
   $(SDK_ROOT)/components/libraries/util \
+  $(PROJ_DIR)/include \
 
 # Libraries common to all targets
 LIB_FILES += \
