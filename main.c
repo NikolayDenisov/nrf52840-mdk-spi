@@ -1,102 +1,62 @@
+#include "epd.h"
+#include "gpio.h"
 #include "nrf52840.h"
 #include "nrf_delay.h"
+#include "spi.h"
 #include <stdint.h>
 
-#define PIN_MOSI 21
-#define PIN_SCK 17
-#define PIN_CS 15
-#define PIN_DC 16
-#define PIN_RST 14
-#define PIN_BUSY 13
+#define DRIVER_OUTPUT_CONTROL 0x01
 
-void gpio_init() {
-  NRF_P0->DIRSET = (1 << PIN_RST) | (1 << PIN_DC) | (1 << PIN_CS);
-  NRF_P0->DIRCLR = (1 << PIN_BUSY);
-  NRF_P0->PIN_CNF[PIN_BUSY] =
-      (GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos);
-}
-static void gpio_set(uint32_t pin) { NRF_P0->OUTSET = (1 << pin); }
+#define BOOSTER_SOFT_START_CONTROL 0x0C
+#define WRITE_VCOM_REGISTER 0x2C
+#define SET_DUMMY_LINE_PERIOD 0x3A
+#define SET_GATE_TIME 0x3B
+#define DATA_ENTRY_MODE_SETTING 0x11
+#define WRITE_LUT_REGISTER 0x32
 
-static void gpio_clear(uint32_t pin) { NRF_P0->OUTCLR = (1 << pin); }
+const uint8_t font5x7[][5] = {
+    // только A-Z, пробел, H, E, L, O, W, R, D — минимум для "HELLO WORLD"
+    [' '] = {0x00, 0x00, 0x00, 0x00, 0x00},
+    ['H'] = {0x7F, 0x08, 0x08, 0x08, 0x7F},
+    ['E'] = {0x7F, 0x49, 0x49, 0x49, 0x41},
+    ['L'] = {0x7F, 0x40, 0x40, 0x40, 0x40},
+    ['O'] = {0x3E, 0x41, 0x41, 0x41, 0x3E},
+    ['W'] = {0x7F, 0x02, 0x0C, 0x02, 0x7F},
+    ['R'] = {0x7F, 0x09, 0x19, 0x29, 0x46},
+    ['D'] = {0x7F, 0x41, 0x41, 0x22, 0x1C},
+};
+#define WIDTH_BYTES (EPD_WIDTH / 8)
+uint8_t framebuffer[EPD_HEIGHT][WIDTH_BYTES];
 
-static uint8_t gpio_read(uint32_t pin) {
-  return (NRF_P0->IN & (1 << pin)) ? 1 : 0;
-}
-
-static void spi_init() {
-  NRF_SPIM0->PSEL.SCK = PIN_SCK;
-  NRF_SPIM0->PSEL.MOSI = PIN_MOSI;
-  NRF_SPIM0->PSEL.MISO = 0xFFFFFFFF;
-  NRF_SPIM0->FREQUENCY = SPIM_FREQUENCY_FREQUENCY_M8;
-  NRF_SPIM0->CONFIG = (SPIM_CONFIG_ORDER_MsbFirst << SPIM_CONFIG_ORDER_Pos);
-  NRF_SPIM0->ENABLE = (SPIM_ENABLE_ENABLE_Enabled << SPIM_ENABLE_ENABLE_Pos);
-}
-
-static void spi_tx(const uint8_t data) {
-  NRF_SPIM0->TXD.PTR = (uint32_t)&data;
-  NRF_SPIM0->TXD.MAXCNT = 1;
-  NRF_SPIM0->TASKS_START = 1;
-  while (!NRF_SPIM0->EVENTS_END) {
+void draw_char(uint8_t x, uint8_t y, char c) {
+  if (c < 32 || c > 127)
+    c = ' ';
+  for (uint8_t col = 0; col < 5; col++) {
+    uint8_t line = font5x7[(uint8_t)c][col];
+    for (uint8_t row = 0; row < 7; row++) {
+      if (line & (1 << row)) {
+        uint16_t byte_index = x / 8;
+        framebuffer[y + row][byte_index] &= ~(1 << (7 - (x % 8)));
+      }
+    }
+    x++;
   }
-  NRF_SPIM0->EVENTS_END = 0;
 }
 
-static void epd_send_cmd(uint8_t cmd) {
-  gpio_clear(PIN_DC);
-  gpio_clear(PIN_CS);
-  spi_tx(cmd);
-  gpio_set(PIN_CS);
-}
-
-static void epd_send_data(uint8_t data) {
-  gpio_set(PIN_DC);
-  gpio_clear(PIN_CS);
-  spi_tx(data);
-  gpio_set(PIN_CS);
-}
-
-static void epd_wait_busy() {
-  while (gpio_read(PIN_BUSY))
-    nrf_delay_ms(10);
-}
-
-static void epd_reset() {
-  gpio_clear(PIN_RST);
-  nrf_delay_ms(200);
-  gpio_set(PIN_RST);
-  nrf_delay_ms(200);
-}
-
-static void epd_init() {
-  epd_reset();
-
-  epd_send_cmd(0x01); // POWER SETTING
-  epd_send_data(0x07);
-  epd_send_data(0x00);
-  epd_send_data(0x08);
-  epd_send_data(0x00);
-}
-
-static void epd_display_frame(const uint8_t *black, const uint8_t *red,
-                              size_t len) {
-  epd_send_cmd(0x10); // Black
-  for (size_t i = 0; i < len; ++i)
-    epd_send_data(black[i]);
-
-  epd_send_cmd(0x13); // Red
-  for (size_t i = 0; i < len; ++i)
-    epd_send_data(red[i]);
-
-  epd_send_cmd(0x12); // Display refresh
-  epd_wait_busy();
-}
-
-void epd_display_digit_1() {
-  epd_send_cmd(0x10); // Начало буферизации изображения
-  for (int i = 0; i < 100; i++) {
-    epd_send_data(0xFF); // (упрощенно, передача пикселей, представляющих "1")
+void draw_text(uint8_t x, uint8_t y, const char *str) {
+  while (*str) {
+    draw_char(x, y, *str++);
+    x += 6; // 5px + 1px пробел
   }
-  epd_send_cmd(0x12); // Обновление изображения
+}
+void epd_display_framebuffer(void) {
+  epd_send_command(0x24); // WRITE_RAM
+  for (uint16_t y = 0; y < EPD_HEIGHT; y++) {
+    for (uint16_t x = 0; x < WIDTH_BYTES; x++) {
+      epd_send_data(framebuffer[y][x]);
+    }
+  }
+  turn_on_display();
 }
 void clock_initialization(void) {
   NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
@@ -116,8 +76,9 @@ int main(void) {
   gpio_init();
   spi_init();
   epd_init();
+  clear();
 
-  epd_display_digit_1();
-  while (1) {
-  }
+  draw_text(10, 10, "HELLO");
+  draw_text(10, 20, "WORLD");
+  epd_display_framebuffer();
 }
