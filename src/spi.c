@@ -2,19 +2,10 @@
 #include "gpio.h"
 #include "nrf52840.h"
 #include "nrf52840_bitfields.h"
+#include <stddef.h>
 #include <stdint.h>
 
 void spi_init() {
-  gpio_set(PIN_SCK);
-  NRF_P0->DIRSET = (1 << PIN_SCK); // Set SCK as output
-
-  gpio_clear(PIN_MOSI);
-  NRF_P0->DIRSET = (1 << PIN_MOSI); // Set MOSI as output
-
-  gpio_set(PIN_CS);
-  NRF_P0->DIRSET = (1 << PIN_CS); // Set CS as output
-  // NRF_P0->OUTSET = (1 << PIN_CS);   // Set CS high
-
   NRF_SPIM0->PSEL.SCK = PIN_SCK;
   NRF_SPIM0->PSEL.MOSI = PIN_MOSI;
 
@@ -33,6 +24,15 @@ void spi_send(uint8_t data) {
   NRF_SPIM0->TXD.PTR = (uint32_t)&data;
   NRF_SPIM0->TXD.MAXCNT = 1;
 
+  NRF_SPIM0->TASKS_START = 1;
+  while (!NRF_SPIM0->EVENTS_END) {
+  }
+  NRF_SPIM0->EVENTS_END = 0;
+}
+
+void spi_send_buffer(uint8_t *buffer, size_t length) {
+  NRF_SPIM0->TXD.PTR = (uint32_t)buffer;
+  NRF_SPIM0->TXD.MAXCNT = length;
   NRF_SPIM0->TASKS_START = 1;
   while (!NRF_SPIM0->EVENTS_END) {
   }

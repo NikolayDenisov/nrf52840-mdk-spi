@@ -4,6 +4,7 @@
 #include "nrf52840.h"
 #include "nrf_delay.h"
 #include "spi.h"
+#include <string.h>
 
 void ready_busy(void) {
   while (gpio_read(PIN_BUSY)) {
@@ -63,22 +64,22 @@ uint8_t WS_20_30_2IN13_V3[159] = {
     0x0,  0x32, 0x36};
 
 void EPD_2IN13_V3_LUT(uint8_t *lut) {
-  unsigned char count;
+  uint8_t count;
   epd_send_command(0x32);
   for (count = 0; count < 153; count++) {
     epd_send_data(lut[count]);
   }
 
-  epd_send_command(0x3f);
-  epd_send_data(*(lut + 153));
-  epd_send_command(0x03); // gate voltage
-  epd_send_data(*(lut + 154));
-  epd_send_command(0x04);      // source voltage
-  epd_send_data(*(lut + 155)); // VSH
-  epd_send_data(*(lut + 156)); // VSH2
-  epd_send_data(*(lut + 157)); // VSL
-  epd_send_command(0x2c);      // VCOM
-  epd_send_data(*(lut + 158));
+  // epd_send_command(0x3f);
+  // epd_send_data(*(lut + 153));
+  // epd_send_command(0x03); // gate voltage
+  // epd_send_data(*(lut + 154));
+  // epd_send_command(0x04);      // source voltage
+  // epd_send_data(*(lut + 155)); // VSH
+  // epd_send_data(*(lut + 156)); // VSH2
+  // epd_send_data(*(lut + 157)); // VSL
+  // epd_send_command(0x2c);      // VCOM
+  // epd_send_data(*(lut + 158));
 }
 
 void EPD_2in13_V3_TurnOnDisplay(void) {
@@ -157,18 +158,26 @@ void set_cursor(uint16_t x, uint16_t y) {
 #define EPD_2in13_V3_WIDTH 122
 #define EPD_2in13_V3_HEIGHT 250
 
-void EPD_2in13_V3_Clear(void) {
-  int w, h;
-  w = (EPD_WIDTH % 8 == 0) ? (EPD_WIDTH / 8) : (EPD_WIDTH / 8 + 1);
-  h = EPD_HEIGHT;
-  epd_send_command(0x24);
-  for (int j = 0; j < h; j++) {
-    for (int i = 0; i < w; i++) {
-      epd_send_data(0xff);
-    }
-  }
+#define MAX_WIDTH_BYTES ((EPD_WIDTH + 7) / 8)
+#define MAX_HEIGHT (EPD_HEIGHT)
+#define MAX_BUFFER_SIZE (MAX_WIDTH_BYTES * MAX_HEIGHT)
 
-  // DISPLAY REFRESH
+static uint8_t buffer[MAX_BUFFER_SIZE];
+
+void EPD_2in13_V3_Clear(void) {
+  int w = (EPD_WIDTH % 8 == 0) ? (EPD_WIDTH / 8) : (EPD_WIDTH / 8 + 1);
+  int h = EPD_HEIGHT;
+  int size = w * h;
+
+  memset(buffer, 0xFF, size);
+
+  epd_send_command(0x24);
+
+  gpio_set(PIN_DC);
+  gpio_clear(PIN_CS);
+  spi_send_buffer(buffer, size);
+  gpio_set(PIN_CS);
+
   epd_send_command(0x22);
   epd_send_data(0xC7);
   epd_send_command(0x20);

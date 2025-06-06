@@ -73,7 +73,7 @@ void clock_initialization(void) {
 
 int main(void) {
   clock_initialization();
-  // gpio_init();
+  gpio_init();
   spi_init();
   epd_init();
   EPD_2in13_V3_Clear();
