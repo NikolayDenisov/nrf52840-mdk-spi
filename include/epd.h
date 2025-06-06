@@ -15,6 +15,9 @@ void set_cursor(uint16_t x, uint16_t y);
 void set_windowds(uint16_t x_start, uint16_t y_start, uint16_t x_end,
                   uint16_t y_end);
 void set_lut(const unsigned char *lut);
-void clear(void);
+void EPD_2in13_V3_Clear(void);
+void EPD_2IN13_V2_LUT_by_host(uint8_t *lut);
+
+void EPD_2IN13_V3_LUT(uint8_t *lut);
 
 #endif

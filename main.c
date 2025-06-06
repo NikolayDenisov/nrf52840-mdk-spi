@@ -73,12 +73,12 @@ void clock_initialization(void) {
 
 int main(void) {
   clock_initialization();
-  gpio_init();
+  // gpio_init();
   spi_init();
   epd_init();
-  clear();
+  EPD_2in13_V3_Clear();
 
-  draw_text(10, 10, "HELLO");
-  draw_text(10, 20, "WORLD");
-  epd_display_framebuffer();
+  // draw_text(10, 10, "HELLO");
+  // draw_text(10, 20, "WORLD");
+  // epd_display_framebuffer();
 }
