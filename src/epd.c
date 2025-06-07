@@ -1,5 +1,6 @@
 
 #include "epd.h"
+#include "config.h"
 #include "gpio.h"
 #include "nrf52840.h"
 #include "nrf_delay.h"
@@ -189,4 +190,41 @@ void turn_on_display(void) {
   epd_send_data(0xc7);
   epd_send_command(0x20); // Activate Display Update Sequence
   ready_busy();
+}
+
+void EPD_2in13_V3_Display(UBYTE *Image) {
+  UWORD Width, Height;
+  Width = (EPD_2in13_V3_WIDTH % 8 == 0) ? (EPD_2in13_V3_WIDTH / 8)
+                                        : (EPD_2in13_V3_WIDTH / 8 + 1);
+  Height = EPD_2in13_V3_HEIGHT;
+
+  epd_send_command(0x24);
+  for (UWORD j = 0; j < Height; j++) {
+    for (UWORD i = 0; i < Width; i++) {
+      epd_send_data(Image[i + j * Width]);
+    }
+  }
+
+  EPD_2in13_V3_TurnOnDisplay();
+}
+
+void EPD_2in13_V3_Display_Base(UBYTE *Image) {
+  UWORD Width, Height;
+  Width = (EPD_2in13_V3_WIDTH % 8 == 0) ? (EPD_2in13_V3_WIDTH / 8)
+                                        : (EPD_2in13_V3_WIDTH / 8 + 1);
+  Height = EPD_2in13_V3_HEIGHT;
+
+  epd_send_command(0x24); // Write Black and White image to RAM
+  for (UWORD j = 0; j < Height; j++) {
+    for (UWORD i = 0; i < Width; i++) {
+      epd_send_data(Image[i + j * Width]);
+    }
+  }
+  epd_send_command(0x26); // Write Black and White image to RAM
+  for (UWORD j = 0; j < Height; j++) {
+    for (UWORD i = 0; i < Width; i++) {
+      epd_send_data(Image[i + j * Width]);
+    }
+  }
+  EPD_2in13_V3_TurnOnDisplay();
 }

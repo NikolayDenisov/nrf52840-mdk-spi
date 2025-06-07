@@ -20,6 +20,10 @@ SRC_FILES += \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT_Syscalls_GCC.c \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT_printf.c \
   $(SDK_ROOT)/modules/nrfx/mdk/system_nrf52840.c \
+  $(PROJ_DIR)/GUI/GUI_Paint.c \
+  $(PROJ_DIR)/Fonts/font24.c \
+  $(PROJ_DIR)/Fonts/font16.c \
+    $(PROJ_DIR)/Fonts/font12.c \
 
 
 # Include folders common to all targets
@@ -40,6 +44,8 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/boards \
   $(SDK_ROOT)/components/libraries/util \
   $(PROJ_DIR)/include \
+  $(PROJ_DIR)/GUI \
+  $(PROJ_DIR)/Fonts \
 
 # Libraries common to all targets
 LIB_FILES += \

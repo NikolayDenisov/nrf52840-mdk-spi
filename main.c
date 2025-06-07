@@ -1,9 +1,11 @@
+#include "GUI_Paint.h"
 #include "epd.h"
 #include "gpio.h"
 #include "nrf52840.h"
 #include "nrf_delay.h"
 #include "spi.h"
 #include <stdint.h>
+#include <stdlib.h>
 
 #define DRIVER_OUTPUT_CONTROL 0x01
 
@@ -71,6 +73,12 @@ void clock_initialization(void) {
   }
 }
 
+void EPD_2in13_V3_Sleep(void) {
+  epd_send_command(0x10); // enter deep sleep
+  epd_send_data(0x01);
+  nrf_delay_ms(100);
+}
+
 int main(void) {
   clock_initialization();
   gpio_init();
@@ -78,7 +86,29 @@ int main(void) {
   epd_init();
   EPD_2in13_V3_Clear();
 
-  // draw_text(10, 10, "HELLO");
-  // draw_text(10, 20, "WORLD");
-  // epd_display_framebuffer();
+  UBYTE *BlackImage;
+  UWORD Imagesize =
+      ((EPD_2in13_V3_WIDTH % 8 == 0) ? (EPD_2in13_V3_WIDTH / 8)
+                                     : (EPD_2in13_V3_WIDTH / 8 + 1)) *
+      EPD_2in13_V3_HEIGHT;
+  if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL) {
+    // Debug("Failed to apply for black memory...\r\n");
+    return -1;
+  }
+
+  Paint_NewImage(BlackImage, EPD_2in13_V3_WIDTH, EPD_2in13_V3_HEIGHT, 90,
+                 WHITE);
+  Paint_Clear(WHITE);
+
+  Paint_SetRotate(ROTATE_270);
+
+  Paint_DrawString_EN(0, 15, "Temp = ", &Font24, WHITE, BLACK);
+  Paint_DrawNumDecimals(120, 15, 12.2, &Font24, 1, BLACK, WHITE);
+
+  EPD_2in13_V3_Display(BlackImage);
+
+  nrf_delay_ms(5000);
+  epd_init();
+  EPD_2in13_V3_Clear();
+  EPD_2in13_V3_Sleep();
 }

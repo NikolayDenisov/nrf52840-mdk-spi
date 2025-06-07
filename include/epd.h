@@ -1,9 +1,14 @@
 #ifndef EPD_H
 #define EPD_H
+#include "config.h"
 #include <stdint.h>
 
 #define EPD_WIDTH 122
 #define EPD_HEIGHT 250
+
+// Display resolution
+#define EPD_2in13_V3_WIDTH 122
+#define EPD_2in13_V3_HEIGHT 250
 
 void ready_busy(void);
 void epd_send_command(uint8_t cmd);
@@ -19,5 +24,7 @@ void EPD_2in13_V3_Clear(void);
 void EPD_2IN13_V2_LUT_by_host(uint8_t *lut);
 
 void EPD_2IN13_V3_LUT(uint8_t *lut);
+void EPD_2in13_V3_Display(UBYTE *Image);
+void EPD_2in13_V3_Display_Base(UBYTE *Image);
 
 #endif
