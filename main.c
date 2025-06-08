@@ -103,7 +103,9 @@ int main(void) {
   Paint_SetRotate(ROTATE_270);
 
   Paint_DrawString_EN(0, 15, "Temp = ", &Font24, WHITE, BLACK);
-  Paint_DrawNumDecimals(120, 15, 12.2, &Font24, 1, BLACK, WHITE);
+  Paint_DrawNumDecimals(120, 15, 25.2, &Font24, 1, BLACK, WHITE);
+  Paint_DrawCircle(200, 15, 4, BLACK, 1, DRAW_FILL_EMPTY);
+  Paint_DrawString_EN(205, 15, "C", &Font24, WHITE, BLACK);
 
   EPD_2in13_V3_Display(BlackImage);
 
