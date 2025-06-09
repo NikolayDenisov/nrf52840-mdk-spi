@@ -1,56 +1,24 @@
 #include "GUI_Paint.h"
 #include "epd.h"
 #include "gpio.h"
+#include "hdc2080.h"
 #include "nrf52840.h"
 #include "nrf_delay.h"
 #include "spi.h"
+#include "twi.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
-#define DRIVER_OUTPUT_CONTROL 0x01
-
-#define BOOSTER_SOFT_START_CONTROL 0x0C
-#define WRITE_VCOM_REGISTER 0x2C
-#define SET_DUMMY_LINE_PERIOD 0x3A
-#define SET_GATE_TIME 0x3B
-#define DATA_ENTRY_MODE_SETTING 0x11
-#define WRITE_LUT_REGISTER 0x32
-
-const uint8_t font5x7[][5] = {
-    // только A-Z, пробел, H, E, L, O, W, R, D — минимум для "HELLO WORLD"
-    [' '] = {0x00, 0x00, 0x00, 0x00, 0x00},
-    ['H'] = {0x7F, 0x08, 0x08, 0x08, 0x7F},
-    ['E'] = {0x7F, 0x49, 0x49, 0x49, 0x41},
-    ['L'] = {0x7F, 0x40, 0x40, 0x40, 0x40},
-    ['O'] = {0x3E, 0x41, 0x41, 0x41, 0x3E},
-    ['W'] = {0x7F, 0x02, 0x0C, 0x02, 0x7F},
-    ['R'] = {0x7F, 0x09, 0x19, 0x29, 0x46},
-    ['D'] = {0x7F, 0x41, 0x41, 0x22, 0x1C},
-};
 #define WIDTH_BYTES (EPD_WIDTH / 8)
+#define TEMP_X 120
+#define TEMP_Y 15
+
+#define HUMID_X 120
+#define HUMID_Y 45
+
 uint8_t framebuffer[EPD_HEIGHT][WIDTH_BYTES];
 
-void draw_char(uint8_t x, uint8_t y, char c) {
-  if (c < 32 || c > 127)
-    c = ' ';
-  for (uint8_t col = 0; col < 5; col++) {
-    uint8_t line = font5x7[(uint8_t)c][col];
-    for (uint8_t row = 0; row < 7; row++) {
-      if (line & (1 << row)) {
-        uint16_t byte_index = x / 8;
-        framebuffer[y + row][byte_index] &= ~(1 << (7 - (x % 8)));
-      }
-    }
-    x++;
-  }
-}
-
-void draw_text(uint8_t x, uint8_t y, const char *str) {
-  while (*str) {
-    draw_char(x, y, *str++);
-    x += 6; // 5px + 1px пробел
-  }
-}
 void epd_display_framebuffer(void) {
   epd_send_command(0x24); // WRITE_RAM
   for (uint16_t y = 0; y < EPD_HEIGHT; y++) {
@@ -58,14 +26,14 @@ void epd_display_framebuffer(void) {
       epd_send_data(framebuffer[y][x]);
     }
   }
-  turn_on_display();
+  epd_turn_on_display();
 }
+
 void clock_initialization(void) {
   NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
   while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) {
   }
-
   NRF_CLOCK->LFCLKSRC = (CLOCK_LFCLKSRC_SRC_Xtal << CLOCK_LFCLKSRC_SRC_Pos);
   NRF_CLOCK->EVENTS_LFCLKSTARTED = 0;
   NRF_CLOCK->TASKS_LFCLKSTART = 1;
@@ -81,36 +49,75 @@ void EPD_2in13_V3_Sleep(void) {
 
 int main(void) {
   clock_initialization();
+  twi_init();
   gpio_init();
   spi_init();
   epd_init();
-  EPD_2in13_V3_Clear();
+  epd_clear();
 
   UBYTE *BlackImage;
   UWORD Imagesize =
       ((EPD_2in13_V3_WIDTH % 8 == 0) ? (EPD_2in13_V3_WIDTH / 8)
                                      : (EPD_2in13_V3_WIDTH / 8 + 1)) *
       EPD_2in13_V3_HEIGHT;
-  if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL) {
-    // Debug("Failed to apply for black memory...\r\n");
+  BlackImage = (UBYTE *)malloc(Imagesize);
+  if (BlackImage == NULL) {
     return -1;
   }
 
   Paint_NewImage(BlackImage, EPD_2in13_V3_WIDTH, EPD_2in13_V3_HEIGHT, 90,
                  WHITE);
   Paint_Clear(WHITE);
-
   Paint_SetRotate(ROTATE_270);
 
-  Paint_DrawString_EN(0, 15, "Temp = ", &Font24, WHITE, BLACK);
-  Paint_DrawNumDecimals(120, 15, 25.2, &Font24, 1, BLACK, WHITE);
-  Paint_DrawCircle(200, 15, 4, BLACK, 1, DRAW_FILL_EMPTY);
-  Paint_DrawString_EN(205, 15, "C", &Font24, WHITE, BLACK);
+  // Настроим датчик температуры
+  hdc2080_reset();
+  hdc2080_set_measurement_mode();
 
-  EPD_2in13_V3_Display(BlackImage);
+  // Статическая часть экрана
+  Paint_DrawString_EN(0, TEMP_Y, "Temp = ", &Font24, WHITE, BLACK);
+  Paint_DrawCircle(205, TEMP_Y, 4, BLACK, 1, DRAW_FILL_EMPTY);
+  Paint_DrawString_EN(210, TEMP_Y, "C", &Font24, WHITE, BLACK);
 
-  nrf_delay_ms(5000);
-  epd_init();
-  EPD_2in13_V3_Clear();
+  Paint_DrawString_EN(0, HUMID_Y, "Humid = ", &Font24, WHITE, BLACK);
+  Paint_DrawString_EN(210, HUMID_Y, "%", &Font24, WHITE, BLACK);
+
+  epd_display(BlackImage); // Отрисовка фона и текста
+  nrf_delay_ms(1000);
+
+  while (1) {
+    hdc2080_trigger_measurement();
+
+    // Ожидаем готовность данных
+    uint8_t status;
+    do {
+      status = hdc2080_read_interrupt_status();
+      nrf_delay_ms(100);
+    } while ((status & 0x80) == 0);
+
+    float temperature = hd2080_read_temp();
+    float humidity = hdc2080_read_humidity();
+
+    // Очистим старое значение температуры
+    Paint_DrawRectangle(TEMP_X, TEMP_Y, TEMP_X + 80, TEMP_Y + 24, WHITE,
+                        DOT_PIXEL_1X1, DRAW_FILL_FULL);
+
+    Paint_DrawRectangle(HUMID_X, HUMID_Y, HUMID_X + 80, HUMID_Y + 24, WHITE,
+                        DOT_PIXEL_1X1, DRAW_FILL_FULL);
+
+    // Нарисуем новое значение
+    Paint_DrawNumDecimals(TEMP_X, TEMP_Y, temperature, &Font24, 1, BLACK,
+                          WHITE);
+
+    Paint_DrawNumDecimals(HUMID_X, HUMID_Y, humidity, &Font24, 1, BLACK, WHITE);
+
+    // Частичное обновление экрана
+    epd_display_partial(BlackImage);
+
+    nrf_delay_ms(1000);
+  }
+
+  // В реальности до сюда не дойдёт, но можно вызвать sleep
   EPD_2in13_V3_Sleep();
+  return 0;
 }

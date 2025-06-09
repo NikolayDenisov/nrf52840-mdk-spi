@@ -10,9 +10,9 @@
 #define PIN_RST 14
 #define PIN_BUSY 13
 
-void gpio_set(uint32_t pin);
-void gpio_clear(uint32_t pin);
-uint8_t gpio_read(uint32_t pin);
+void gpio_pin_set(uint32_t pin);
+void gpio_pin_clear(uint32_t pin);
+uint8_t gpio_pin_read(uint32_t pin);
 void gpio_init();
 
 #endif

@@ -23,7 +23,9 @@ SRC_FILES += \
   $(PROJ_DIR)/GUI/GUI_Paint.c \
   $(PROJ_DIR)/Fonts/font24.c \
   $(PROJ_DIR)/Fonts/font16.c \
-    $(PROJ_DIR)/Fonts/font12.c \
+  $(PROJ_DIR)/Fonts/font12.c \
+  $(PROJ_DIR)/src/twi.c \
+  $(PROJ_DIR)/src/hdc2080.c \
 
 
 # Include folders common to all targets

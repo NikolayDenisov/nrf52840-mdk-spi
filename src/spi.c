@@ -17,7 +17,7 @@ void spi_init() {
                       (SPIM_CONFIG_CPHA_Leading << SPIM_CONFIG_CPHA_Pos);
 
   NRF_SPIM0->ENABLE = (SPIM_ENABLE_ENABLE_Enabled << SPIM_ENABLE_ENABLE_Pos);
-  gpio_set(PIN_CS);
+  gpio_pin_set(PIN_CS);
 }
 
 void spi_send(uint8_t data) {

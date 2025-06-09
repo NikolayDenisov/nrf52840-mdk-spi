@@ -17,7 +17,8 @@
         "gpio.h": "c",
         "spi.h": "c",
         "epd.h": "c",
-        "gui_paint.h": "c"
+        "gui_paint.h": "c",
+        "hdc2080.h": "c"
     },
     "nrf-connect.topdir": "${nrf-connect.sdk:2.6.1}",
     "cortex-debug.variableUseNaturalFormat": false
