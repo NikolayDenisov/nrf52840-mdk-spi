@@ -21,9 +21,11 @@ SRC_FILES += \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT_printf.c \
   $(SDK_ROOT)/modules/nrfx/mdk/system_nrf52840.c \
   $(PROJ_DIR)/GUI/GUI_Paint.c \
+  $(PROJ_DIR)/Fonts/font40.c \
   $(PROJ_DIR)/Fonts/font24.c \
   $(PROJ_DIR)/Fonts/font16.c \
   $(PROJ_DIR)/Fonts/font12.c \
+  $(PROJ_DIR)/Fonts/font20.c \
   $(PROJ_DIR)/src/twi.c \
   $(PROJ_DIR)/src/hdc2080.c \
 

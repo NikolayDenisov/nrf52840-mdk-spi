@@ -6,8 +6,8 @@
 #include <stdint.h>
 
 void spi_init() {
-  NRF_SPIM0->PSEL.SCK = PIN_SCK;
-  NRF_SPIM0->PSEL.MOSI = PIN_MOSI;
+  NRF_SPIM0->PSEL.SCK = SPI_PIN_SCK;
+  NRF_SPIM0->PSEL.MOSI = SPI_PIN_MOSI;
 
   NRF_SPIM0->FREQUENCY = SPIM_FREQUENCY_FREQUENCY_M4
                          << SPIM_FREQUENCY_FREQUENCY_Pos;
@@ -17,7 +17,7 @@ void spi_init() {
                       (SPIM_CONFIG_CPHA_Leading << SPIM_CONFIG_CPHA_Pos);
 
   NRF_SPIM0->ENABLE = (SPIM_ENABLE_ENABLE_Enabled << SPIM_ENABLE_ENABLE_Pos);
-  gpio_pin_set(PIN_CS);
+  gpio_pin_set(SPI_PIN_CS);
 }
 
 void spi_send(uint8_t data) {

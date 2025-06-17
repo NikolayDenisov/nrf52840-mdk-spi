@@ -8,32 +8,32 @@
 #include <string.h>
 
 void epd_ready_busy(void) {
-  while (gpio_pin_read(PIN_BUSY)) {
+  while (gpio_pin_read(EPD_PIN_BUSY)) {
     // Wait until the busy pin is low
     nrf_delay_ms(10);
   }
 }
 
 void epd_send_command(uint8_t cmd) {
-  gpio_pin_clear(PIN_DC);
-  gpio_pin_clear(PIN_CS);
+  gpio_pin_clear(EPD_PIN_DC);
+  gpio_pin_clear(SPI_PIN_CS);
   spi_send(cmd);
-  gpio_pin_set(PIN_CS);
+  gpio_pin_set(SPI_PIN_CS);
 }
 
 void epd_send_data(uint8_t data) {
-  gpio_pin_set(PIN_DC);
-  gpio_pin_clear(PIN_CS);
+  gpio_pin_set(EPD_PIN_DC);
+  gpio_pin_clear(SPI_PIN_CS);
   spi_send(data);
-  gpio_pin_set(PIN_CS);
+  gpio_pin_set(SPI_PIN_CS);
 }
 
 void epd_reset(void) {
-  gpio_pin_set(PIN_RST);
+  gpio_pin_set(EPD_PIN_RST);
   nrf_delay_ms(200);
-  gpio_pin_clear(PIN_RST);
+  gpio_pin_clear(EPD_PIN_RST);
   nrf_delay_ms(5);
-  gpio_pin_set(PIN_RST);
+  gpio_pin_set(EPD_PIN_RST);
   nrf_delay_ms(200);
 }
 
@@ -174,10 +174,10 @@ void epd_clear(void) {
 
   epd_send_command(0x24);
 
-  gpio_pin_set(PIN_DC);
-  gpio_pin_clear(PIN_CS);
+  gpio_pin_set(EPD_PIN_DC);
+  gpio_pin_clear(SPI_PIN_CS);
   spi_send_buffer(buffer, size);
-  gpio_pin_set(PIN_CS);
+  gpio_pin_set(SPI_PIN_CS);
 
   epd_send_command(0x22);
   epd_send_data(0xC7);
@@ -259,9 +259,9 @@ void epd_display_partial(UBYTE *Image) {
   Height = EPD_2in13_V3_HEIGHT;
 
   // Reset
-  gpio_pin_clear(PIN_RST);
+  gpio_pin_clear(EPD_PIN_RST);
   nrf_delay_ms(1);
-  gpio_pin_set(PIN_RST);
+  gpio_pin_set(EPD_PIN_RST);
 
   epd_lut_by_host(WF_PARTIAL_2IN13_V3);
 
