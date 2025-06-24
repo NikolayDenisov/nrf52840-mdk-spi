@@ -1,5 +1,6 @@
 
 #include "gpio.h"
+#include "nrf.h"
 #include "nrf52840.h"
 #include "nrf52840_bitfields.h"
 
@@ -27,4 +28,21 @@ void gpio_init() {
   NRF_P0->PIN_CNF[EPD_PIN_BUSY] =
       (GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos);
   gpio_pin_clear(EPD_PIN_DC);
+}
+
+void gpio_config_for_interrupt(void) {
+  NRF_P1->PIN_CNF[HDC2080_INT_PIN] =
+      (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |
+      (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos) |
+      (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
+
+  NRF_GPIOTE->CONFIG[0] =
+      (HDC2080_INT_PIN << GPIOTE_CONFIG_PSEL_Pos) |
+      (1 << GPIOTE_CONFIG_PORT_Pos) |
+      (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos) |
+      (GPIOTE_CONFIG_POLARITY_LoToHi << GPIOTE_CONFIG_POLARITY_Pos);
+
+  NRF_GPIOTE->EVENTS_IN[0] = 0; // Clear event
+  NRF_GPIOTE->INTENSET = GPIOTE_INTENSET_IN0_Msk;
+  NVIC_EnableIRQ(GPIOTE_IRQn); // Enable GPIOTE interrupt
 }

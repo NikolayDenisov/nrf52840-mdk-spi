@@ -17,6 +17,8 @@
 #define HUMID_X 120
 #define HUMID_Y 45
 
+UBYTE *BlackImage;
+
 uint8_t framebuffer[EPD_HEIGHT][WIDTH_BYTES];
 
 void epd_display_framebuffer(void) {
@@ -47,54 +49,11 @@ void EPD_2in13_V3_Sleep(void) {
   nrf_delay_ms(100);
 }
 
-int main(void) {
-  clock_initialization();
-  twi_init();
-  gpio_init();
-  spi_init();
-  epd_init();
-  epd_clear();
+void GPIOTE_IRQHandler(void) {
+  if (NRF_GPIOTE->EVENTS_IN[0]) {
+    NRF_GPIOTE->EVENTS_IN[0] = 0;
 
-  UBYTE *BlackImage;
-  UWORD Imagesize =
-      ((EPD_2in13_V3_WIDTH % 8 == 0) ? (EPD_2in13_V3_WIDTH / 8)
-                                     : (EPD_2in13_V3_WIDTH / 8 + 1)) *
-      EPD_2in13_V3_HEIGHT;
-  BlackImage = (UBYTE *)malloc(Imagesize);
-  if (BlackImage == NULL) {
-    return -1;
-  }
-
-  Paint_NewImage(BlackImage, EPD_2in13_V3_WIDTH, EPD_2in13_V3_HEIGHT, 90,
-                 WHITE);
-  Paint_Clear(WHITE);
-  Paint_SetRotate(ROTATE_270);
-
-  // Настроим датчик температуры
-  hdc2080_reset();
-  hdc2080_set_measurement_mode();
-
-  // Статическая часть экрана
-  Paint_DrawString_EN(0, TEMP_Y, "Temp = ", &Font24, WHITE, BLACK);
-  Paint_DrawCircle(205, TEMP_Y, 4, BLACK, 1, DRAW_FILL_EMPTY);
-  Paint_DrawString_EN(210, TEMP_Y, "C", &Font24, WHITE, BLACK);
-
-  Paint_DrawString_EN(0, HUMID_Y, "Humid = ", &Font24, WHITE, BLACK);
-  Paint_DrawString_EN(210, HUMID_Y, "%", &Font24, WHITE, BLACK);
-
-  epd_display(BlackImage); // Отрисовка фона и текста
-  nrf_delay_ms(1000);
-
-  while (1) {
-    hdc2080_trigger_measurement();
-
-    // Ожидаем готовность данных
-    uint8_t status;
-    do {
-      status = hdc2080_read_interrupt_status();
-      nrf_delay_ms(100);
-    } while ((status & 0x80) == 0);
-
+    uint8_t status = hdc2080_read_interrupt_status();
     float temperature = hd2080_read_temp();
     float humidity = hdc2080_read_humidity();
 
@@ -113,11 +72,70 @@ int main(void) {
 
     // Частичное обновление экрана
     epd_display_partial(BlackImage);
+  }
+}
 
-    nrf_delay_ms(1000);
+// void GPIOTE_IRQHandler(void) {
+//   if (NRF_GPIOTE->EVENTS_IN[0]) {
+//     NRF_GPIOTE->EVENTS_IN[0] = 0; // Clear event
+//     uint8_t status;
+//     status = hdc2080_read_interrupt_status();
+//     static float temperature = 0;
+//     temperature = hd2080_read_temp();
+//   }
+// }
+
+void sensor_init(void) {
+  // Инициализация датчика HDC2080
+  hdc2080_reset();
+  set_rate(ONE_HZ);
+  enable_drdy_interrupt();
+  enable_interrupt();
+  set_interrupt_polarity(ACTIVE_HIGH);
+  hdc2080_set_measurement_mode(TEMP_AND_HUMID);
+}
+
+int main(void) {
+  // clock_initialization();
+  twi_init();
+  gpio_init();
+  sensor_init();
+  gpio_config_for_interrupt();
+  spi_init();
+  epd_init();
+  epd_clear();
+
+  UWORD Imagesize =
+      ((EPD_2in13_V3_WIDTH % 8 == 0) ? (EPD_2in13_V3_WIDTH / 8)
+                                     : (EPD_2in13_V3_WIDTH / 8 + 1)) *
+      EPD_2in13_V3_HEIGHT;
+  BlackImage = (UBYTE *)malloc(Imagesize);
+  if (BlackImage == NULL) {
+    return -1;
   }
 
-  // В реальности до сюда не дойдёт, но можно вызвать sleep
-  EPD_2in13_V3_Sleep();
+  Paint_NewImage(BlackImage, EPD_2in13_V3_WIDTH, EPD_2in13_V3_HEIGHT, 90,
+                 WHITE);
+  Paint_Clear(WHITE);
+  Paint_SetRotate(ROTATE_270);
+
+  // Статическая часть экрана
+  Paint_DrawString_EN(0, TEMP_Y, "Temp = ", &Font24, WHITE, BLACK);
+  Paint_DrawCircle(205, TEMP_Y, 4, BLACK, 1, DRAW_FILL_EMPTY);
+  Paint_DrawString_EN(210, TEMP_Y, "C", &Font24, WHITE, BLACK);
+
+  Paint_DrawString_EN(0, HUMID_Y, "Humid = ", &Font24, WHITE, BLACK);
+  Paint_DrawString_EN(210, HUMID_Y, "%", &Font24, WHITE, BLACK);
+
+  epd_display(BlackImage); // Отрисовка фона и текста
+  nrf_delay_ms(1000);
+  hdc2080_trigger_measurement();
+
+  while (true) {
+    __WFE();
+    __SEV();
+    __WFE();
+  }
+
   return 0;
 }
